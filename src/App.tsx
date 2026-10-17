@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 
 import { TaskForm } from "./components/tasks/TaskForm";
@@ -6,7 +6,16 @@ import { TaskCard } from "./components/tasks/TaskCard";
 import { Modal } from "./components/ui/Modal";
 import { Button } from "./components/ui/TaskUI";
 import type { Task, TaskFormValues, TaskStatus } from "./types/task";
+import { TaskFilters } from "./components/tasks/TaskFilters";
 
+import {
+  DEFAULT_FILTERS,
+  type TaskFilters as TaskFiltersType,
+} from "./types/taskFilters";
+
+import { filterTasks } from "./utils/taskFilters";
+
+import { loadTasks, saveTasks } from "./utils/taskStorage";
 const Container = styled.main`
   max-width: 1200px;
   margin: 0 auto;
@@ -53,11 +62,27 @@ const Summary = styled.p`
 `;
 
 export default function App() {
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<Task[]>(loadTasks);
+
+  const [filters, setFilters] = useState<TaskFiltersType>({
+    ...DEFAULT_FILTERS,
+  });
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [deletingTask, setDeletingTask] = useState<Task | null>(null);
 
+  useEffect(() => {
+    saveTasks(tasks);
+  }, [tasks]);
+  const filteredTasks = useMemo(
+    () => filterTasks(tasks, filters),
+    [tasks, filters],
+  );
+
+  const resetFilters = () => {
+    setFilters({ ...DEFAULT_FILTERS });
+  };
   const openCreateForm = () => {
     setEditingTask(null);
     setIsFormOpen(true);
@@ -144,14 +169,34 @@ export default function App() {
         Total tasks: {tasks.length} | Completed: {completedCount}
       </Summary>
 
+      <TaskFilters
+        filters={filters}
+        onChange={setFilters}
+        onReset={resetFilters}
+      />
+
+      {tasks.length > 0 && (
+        <Summary aria-live="polite">
+          Showing {filteredTasks.length} of {tasks.length} tasks
+        </Summary>
+      )}
+
       {tasks.length === 0 ? (
         <EmptyState>
           <h2>No tasks yet</h2>
           <Description>Create your first task to get started.</Description>
         </EmptyState>
+      ) : filteredTasks.length === 0 ? (
+        <EmptyState>
+          <h2>No matching tasks</h2>
+          <Description>Try adjusting your search or filters.</Description>
+          <Button type="button" onClick={resetFilters}>
+            Clear filters
+          </Button>
+        </EmptyState>
       ) : (
         <TaskGrid aria-label="Tasks">
-          {tasks.map(task => (
+          {filteredTasks.map(task => (
             <TaskCard
               key={task.id}
               task={task}
