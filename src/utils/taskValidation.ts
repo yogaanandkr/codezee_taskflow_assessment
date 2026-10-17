@@ -23,8 +23,7 @@ const isValidDate = (value: string): boolean => {
 export function validateTask(values: TaskFormValues): TaskFormErrors {
   const errors: TaskFormErrors = {};
 
-  // const title = values.title.trim();
-  const title = values.title; // changing to to check codezee's validation
+  const title = values.title.trim();
   const description = values.description.trim();
 
   if (!title) {

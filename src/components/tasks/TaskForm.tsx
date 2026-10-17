@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 
-import type { Task, TaskFormValues, TaskPriority } from "../../types/task";
-
 import { validateTask, type TaskFormErrors } from "../../utils/taskValidation";
 
 import {
@@ -14,6 +12,7 @@ import {
   Select,
   TextArea,
 } from "../ui/TaskUI";
+import type { Task, TaskFormValues, TaskPriority } from "../../types/task";
 
 interface TaskFormProps {
   task?: Task | null;

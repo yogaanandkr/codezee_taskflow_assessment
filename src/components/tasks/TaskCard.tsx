@@ -1,8 +1,8 @@
 import styled from "styled-components";
 
-import type { Task, TaskStatus } from "../../types/task";
 
 import { Button, Select } from "../ui/TaskUI";
+import type { Task, TaskStatus } from "../../types/task";
 
 interface TaskCardProps {
   task: Task;

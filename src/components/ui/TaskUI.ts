@@ -1,4 +1,4 @@
-import styled from "styled-components";
+import styled, {css} from "styled-components";
 
 export const Button = styled.button<{
   $variant?: "primary" | "secondary" | "danger";
@@ -54,17 +54,17 @@ export const Label = styled.label`
   font-weight: 600;
 `;
 
-const fieldStyles = `
+const fieldStyles = css`
   width: 100%;
   padding: 11px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #0f172a;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  background: ${({ theme }) => theme.colors.surface};
+  color: ${({ theme }) => theme.colors.text};
   outline-offset: 2px;
 
   &:focus-visible {
-    outline: 2px solid #2563eb;
+    outline: 2px solid ${({ theme }) => theme.colors.primary};
   }
 `;
 

@@ -1,12 +1,11 @@
 import { useState } from "react";
 import styled from "styled-components";
 
-import type { Task, TaskFormValues, TaskStatus } from "./types/task";
-
 import { TaskForm } from "./components/tasks/TaskForm";
 import { TaskCard } from "./components/tasks/TaskCard";
 import { Modal } from "./components/ui/Modal";
 import { Button } from "./components/ui/TaskUI";
+import type { Task, TaskFormValues, TaskStatus } from "./types/task";
 
 const Container = styled.main`
   max-width: 1200px;
@@ -26,6 +25,7 @@ const Header = styled.header`
 const Heading = styled.h1`
   margin: 0;
   font-size: 32px;
+  color: ${({ theme }) => theme.colors.text};
 `;
 
 const Description = styled.p`

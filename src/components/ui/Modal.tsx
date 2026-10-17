@@ -35,6 +35,13 @@ const Heading = styled.h2`
   font-size: 22px;
 `;
 
+const modalStack: symbol[] = [];
+
+const FOCUSABLE_SELECTOR =
+  "button:not([disabled]), input:not([disabled]), " +
+  "textarea:not([disabled]), select:not([disabled]), " +
+  '[tabindex]:not([tabindex="-1"])';
+
 export function Modal({ title, children, onClose }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
@@ -43,53 +50,66 @@ export function Modal({ title, children, onClose }: ModalProps) {
     onCloseRef.current = onClose;
   }, [onClose]);
 
-  useEffect(() => {
-    const previousFocus = document.activeElement;
+useEffect(() => {
+  const modalId = Symbol("modal");
+  modalStack.push(modalId);
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onCloseRef.current();
+  const previousFocus = document.activeElement;
+
+  const isTopmostModal = () => modalStack[modalStack.length - 1] === modalId;
+
+  const handleKeyDown = (event: KeyboardEvent) => {
+    if (!isTopmostModal()) return;
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      onCloseRef.current();
+      return;
+    }
+
+    if (event.key === "Tab" && dialogRef.current) {
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+      );
+
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialogRef.current.focus();
+        return;
       }
 
-      if (event.key === "Tab" && dialogRef.current) {
-        const focusable = Array.from(
-          dialogRef.current.querySelectorAll<HTMLElement>(
-            "button:not([disabled]), input:not([disabled]), " +
-              "textarea:not([disabled]), select:not([disabled]), " +
-              '[tabindex]:not([tabindex="-1"])',
-          ),
-        );
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
 
-        if (focusable.length === 0) {
-          event.preventDefault();
-          return;
-        }
-
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-
-        if (event.shiftKey && document.activeElement === first) {
-          event.preventDefault();
-          last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault();
-          first.focus();
-        }
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
       }
-    };
+    }
+  };
 
-    document.addEventListener("keydown", handleKeyDown);
+  document.addEventListener("keydown", handleKeyDown);
 
-    dialogRef.current?.querySelector<HTMLElement>("input, button")?.focus();
+  dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus();
 
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
+  return () => {
+    document.removeEventListener("keydown", handleKeyDown);
 
-      if (previousFocus instanceof HTMLElement) {
-        previousFocus.focus();
-      }
-    };
-  }, []);
+    const index = modalStack.indexOf(modalId);
+
+    if (index !== -1) {
+      modalStack.splice(index, 1);
+    }
+
+    if (isTopmostModal() && previousFocus instanceof HTMLElement) {
+      previousFocus.focus();
+    }
+  };
+}, []);
 
   return createPortal(
     <Overlay
