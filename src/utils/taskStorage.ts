@@ -1,4 +1,5 @@
 import type { Task } from "../types/task";
+import { isValidDate } from "./taskValidation";
 
 export const TASK_STORAGE_KEY = "taskflow:tasks:v1";
 
@@ -25,7 +26,7 @@ function isTask(value: unknown): value is Task {
     typeof value.status === "string" &&
     statuses.includes(value.status) &&
     typeof value.dueDate === "string" &&
-    (value.dueDate === "" || /^\d{4}-\d{2}-\d{2}$/.test(value.dueDate)) &&
+    (value.dueDate === "" || isValidDate(value.dueDate)) &&
     typeof value.createdAt === "string" &&
     !Number.isNaN(Date.parse(value.createdAt)) &&
     typeof value.updatedAt === "string" &&

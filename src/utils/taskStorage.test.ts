@@ -58,4 +58,15 @@ describe("taskStorage", () => {
 
     expect(saveTasks([validTask])).toBe(false);
   });
+
+  it("rejects impossible due dates", () => {
+    const invalidTask = {
+      ...validTask,
+      dueDate: "2026-13-45",
+    };
+
+    localStorage.setItem(TASK_STORAGE_KEY, JSON.stringify([invalidTask]));
+
+    expect(loadTasks()).toEqual([]);
+  });
 });

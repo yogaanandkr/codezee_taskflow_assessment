@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useReducer } from "react";
 import styled from "styled-components";
 
 import { TaskForm } from "./components/tasks/TaskForm";
@@ -16,6 +16,7 @@ import {
 import { filterTasks } from "./utils/taskFilters";
 
 import { loadTasks, saveTasks } from "./utils/taskStorage";
+import { taskReducer } from "./utils/taskReducer";
 const Container = styled.main`
   max-width: 1200px;
   margin: 0 auto;
@@ -62,7 +63,19 @@ const Summary = styled.p`
 `;
 
 export default function App() {
-  const [tasks, setTasks] = useState<Task[]>(loadTasks);
+  const [{ tasks, revision }, dispatch] = useReducer(
+    taskReducer,
+    undefined,
+    () => ({
+      tasks: loadTasks(),
+      revision: 0,
+    }),
+  );
+  useEffect(() => {
+    if (revision === 0) return;
+
+    saveTasks(tasks);
+  }, [tasks, revision]);
 
   const [filters, setFilters] = useState<TaskFiltersType>({
     ...DEFAULT_FILTERS,
@@ -72,9 +85,6 @@ export default function App() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [deletingTask, setDeletingTask] = useState<Task | null>(null);
 
-  useEffect(() => {
-    saveTasks(tasks);
-  }, [tasks]);
   const filteredTasks = useMemo(
     () => filterTasks(tasks, filters),
     [tasks, filters],
@@ -102,17 +112,12 @@ export default function App() {
     const now = new Date().toISOString();
 
     if (editingTask) {
-      setTasks(prev =>
-        prev.map(task =>
-          task.id === editingTask.id
-            ? {
-                ...task,
-                ...values,
-                updatedAt: now,
-              }
-            : task,
-        ),
-      );
+      dispatch({
+        type: "UPDATE",
+        id: editingTask.id,
+        values,
+        updatedAt: now,
+      });
     } else {
       const newTask: Task = {
         id: crypto.randomUUID(),
@@ -122,30 +127,28 @@ export default function App() {
         updatedAt: now,
       };
 
-      setTasks(prev => [newTask, ...prev]);
+      dispatch({ type: "CREATE", task: newTask });
     }
 
     closeForm();
   };
 
   const handleStatusChange = (id: string, status: TaskStatus) => {
-    setTasks(prev =>
-      prev.map(task =>
-        task.id === id
-          ? {
-              ...task,
-              status,
-              updatedAt: new Date().toISOString(),
-            }
-          : task,
-      ),
-    );
+    dispatch({
+      type: "CHANGE_STATUS",
+      id,
+      status,
+      updatedAt: new Date().toISOString(),
+    });
   };
 
   const handleDeleteTask = () => {
     if (!deletingTask) return;
 
-    setTasks(prev => prev.filter(task => task.id !== deletingTask.id));
+    dispatch({
+      type: "DELETE",
+      id: deletingTask.id,
+    });
 
     setDeletingTask(null);
   };

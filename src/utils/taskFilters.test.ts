@@ -103,14 +103,49 @@ describe("filterTasks", () => {
     expect(result).toEqual([]);
   });
 
-  it("does not mutate the original task array", () => {
-    const originalIds = tasks.map(task => task.id);
+it("does not mutate the original tasks", () => {
+  const originalTasks = structuredClone(tasks);
 
-    filterTasks(tasks, {
-      ...defaultFilters,
-      search: "login",
-    });
-
-    expect(tasks.map(task => task.id)).toEqual(originalIds);
+  filterTasks(tasks, {
+    ...defaultFilters,
+    search: "login",
   });
+
+  expect(tasks).toEqual(originalTasks);
+});
+  
+  
+it("returns all tasks for whitespace-only search", () => {
+  const result = filterTasks(tasks, {
+    ...defaultFilters,
+    search: "   ",
+  });
+
+  expect(result).toEqual(tasks);
+});
+
+it("combines description search with status and priority", () => {
+  const result = filterTasks(tasks, {
+    search: "authentication",
+    status: "TODO",
+    priority: "HIGH",
+  });
+
+  expect(result.map(task => task.id)).toEqual(["1"]);
+});
+
+it("handles an empty task list", () => {
+  expect(filterTasks([], defaultFilters)).toEqual([]);
+});
+
+it("combines status and priority without search", () => {
+  const result = filterTasks(tasks, {
+    search: "",
+    status: "DONE",
+    priority: "MEDIUM",
+  });
+
+  expect(result.map(task => task.id)).toEqual(["2"]);
+});
+
 });
