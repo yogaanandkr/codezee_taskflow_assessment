@@ -2,7 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Task } from "../types/task";
 
-import { loadTasks, saveTasks, TASK_STORAGE_KEY } from "./taskStorage";
+import {
+  loadTasks,
+  loadTasksWithStatus,
+  saveTasks,
+  TASK_STORAGE_KEY,
+  TASK_BACKUP_KEY,
+} from "./taskStorage";
 
 const validTask: Task = {
   id: "task-1",
@@ -68,5 +74,70 @@ describe("taskStorage", () => {
     localStorage.setItem(TASK_STORAGE_KEY, JSON.stringify([invalidTask]));
 
     expect(loadTasks()).toEqual([]);
+  });
+
+  it("marks malformed JSON as requiring a backup", () => {
+    localStorage.setItem(TASK_STORAGE_KEY, "{invalid");
+
+    const result = loadTasksWithStatus();
+
+    expect(result.tasks).toEqual([]);
+    expect(result.needsBackup).toBe(true);
+    expect(localStorage.getItem(TASK_STORAGE_KEY)).toBe("{invalid");
+  });
+
+  it("marks partially invalid data as requiring a backup", () => {
+    localStorage.setItem(
+      TASK_STORAGE_KEY,
+      JSON.stringify([validTask, { id: "broken", title: "" }]),
+    );
+
+    const result = loadTasksWithStatus();
+
+    expect(result.tasks).toEqual([validTask]);
+    expect(result.needsBackup).toBe(true);
+  });
+
+  it("backs up corrupted data before saving", () => {
+    const corrupted = "{invalid";
+
+    localStorage.setItem(TASK_STORAGE_KEY, corrupted);
+
+    const saved = saveTasks([validTask], true);
+
+    expect(saved).toBe(true);
+    expect(localStorage.getItem(TASK_BACKUP_KEY)).toBe(corrupted);
+    expect(loadTasks()).toEqual([validTask]);
+  });
+
+  it("does not overwrite an existing backup", () => {
+    localStorage.setItem(TASK_BACKUP_KEY, "first-backup");
+    localStorage.setItem(TASK_STORAGE_KEY, "second-version");
+
+    saveTasks([validTask], true);
+
+    expect(localStorage.getItem(TASK_BACKUP_KEY)).toBe("first-backup");
+  });
+
+  it("does not overwrite task data if backup creation fails", () => {
+    const corrupted = "{invalid";
+
+    localStorage.setItem(TASK_STORAGE_KEY, corrupted);
+
+    const originalSetItem = Storage.prototype.setItem;
+
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(
+      function (key, value) {
+        if (key === TASK_BACKUP_KEY) {
+          throw new Error("Storage quota exceeded");
+        }
+
+        return originalSetItem.call(this, key, value);
+      },
+    );
+
+    expect(saveTasks([validTask], true)).toBe(false);
+
+    expect(localStorage.getItem(TASK_STORAGE_KEY)).toBe(corrupted);
   });
 });

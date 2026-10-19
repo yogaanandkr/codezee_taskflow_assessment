@@ -2,6 +2,7 @@ import type { Task } from "../types/task";
 import { isValidDate } from "./taskValidation";
 
 export const TASK_STORAGE_KEY = "taskflow:tasks:v1";
+export const TASK_BACKUP_KEY = "taskflow:tasks:backup:v1";
 
 const priorities = ["LOW", "MEDIUM", "HIGH"];
 const statuses = ["TODO", "IN_PROGRESS", "DONE"];
@@ -34,29 +35,55 @@ function isTask(value: unknown): value is Task {
   );
 }
 
-export function loadTasks(): Task[] {
+export interface LoadTasksResult {
+  tasks: Task[];
+  needsBackup: boolean;
+}
+
+export function loadTasksWithStatus(): LoadTasksResult {
   try {
-    const stored = localStorage.getItem(TASK_STORAGE_KEY);
+    const raw = localStorage.getItem(TASK_STORAGE_KEY);
 
-    if (stored === null) return [];
-
-    const parsed: unknown = JSON.parse(stored);
-
-    if (!Array.isArray(parsed)) {
-      console.warn("Invalid stored tasks: expected an array.");
-      return [];
+    if (raw === null) {
+      return { tasks: [], needsBackup: false };
     }
 
-    return parsed.filter(isTask);
+    const parsed: unknown = JSON.parse(raw);
+
+    if (!Array.isArray(parsed)) {
+      return { tasks: [], needsBackup: true };
+    }
+
+    const validTasks = parsed.filter(isTask);
+
+    return {
+      tasks: validTasks,
+      needsBackup: validTasks.length !== parsed.length,
+    };
   } catch (error) {
     console.warn("Unable to load saved tasks:", error);
-    return [];
+
+    // Conservatively require backup before the next write.
+    return { tasks: [], needsBackup: true };
   }
 }
 
-export function saveTasks(tasks: Task[]): boolean {
+export function loadTasks(): Task[] {
+  return loadTasksWithStatus().tasks;
+}
+
+export function saveTasks(tasks: Task[], preserveOriginal = false): boolean {
   try {
+    if (preserveOriginal) {
+      const original = localStorage.getItem(TASK_STORAGE_KEY);
+
+      if (original !== null && localStorage.getItem(TASK_BACKUP_KEY) === null) {
+        localStorage.setItem(TASK_BACKUP_KEY, original);
+      }
+    }
+
     localStorage.setItem(TASK_STORAGE_KEY, JSON.stringify(tasks));
+
     return true;
   } catch (error) {
     console.warn("Unable to save tasks:", error);
