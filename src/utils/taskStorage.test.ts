@@ -126,18 +126,55 @@ describe("taskStorage", () => {
 
     const originalSetItem = Storage.prototype.setItem;
 
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(
-      function (key, value) {
-        if (key === TASK_BACKUP_KEY) {
-          throw new Error("Storage quota exceeded");
-        }
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
+      this: Storage,
+      key: string,
+      value: string,
+    ) {
+      if (key === TASK_BACKUP_KEY) {
+        throw new Error("Storage quota exceeded");
+      }
 
-        return originalSetItem.call(this, key, value);
-      },
-    );
+      return originalSetItem.call(this, key, value);
+    });
 
     expect(saveTasks([validTask], true)).toBe(false);
 
     expect(localStorage.getItem(TASK_STORAGE_KEY)).toBe(corrupted);
+  });
+
+  it("preserves multiple corrupted versions before overwriting", () => {
+    const firstCorruption = "{first-invalid";
+    const secondCorruption = "{second-invalid";
+
+    localStorage.setItem(TASK_STORAGE_KEY, firstCorruption);
+
+    expect(saveTasks([validTask], true)).toBe(true);
+
+    localStorage.setItem(TASK_STORAGE_KEY, secondCorruption);
+
+    expect(saveTasks([validTask], true)).toBe(true);
+
+    const backupKeys = Object.keys(localStorage).filter(
+      key => key === TASK_BACKUP_KEY || key.startsWith(`${TASK_BACKUP_KEY}:`),
+    );
+
+    const backups = backupKeys.map(key => localStorage.getItem(key));
+
+    expect(backups).toContain(firstCorruption);
+    expect(backups).toContain(secondCorruption);
+  });
+
+  it("does not overwrite data when creating a backup fails", () => {
+    localStorage.setItem(TASK_STORAGE_KEY, "{invalid");
+
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(key => {
+      if (key.startsWith(TASK_BACKUP_KEY)) {
+        throw new Error("Storage quota exceeded");
+      }
+    });
+
+    expect(saveTasks([validTask], true)).toBe(false);
+    expect(localStorage.getItem(TASK_STORAGE_KEY)).toBe("{invalid");
   });
 });

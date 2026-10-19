@@ -66,15 +66,35 @@ describe("taskReducer", () => {
     expect(result.revision).toBe(1);
   });
 
-  it("changes task status", () => {
-    const result = taskReducer(initialState, {
+  it("changes only the target status and preserves other fields", () => {
+    const secondTask: Task = {
+      ...originalTask,
+      id: "task-2",
+      title: "Second task",
+    };
+
+    const state: TaskState = {
+      tasks: [originalTask, secondTask],
+      revision: 0,
+    };
+
+    const updatedAt = "2026-10-19T10:00:00.000Z";
+
+    const result = taskReducer(state, {
       type: "CHANGE_STATUS",
       id: "task-1",
       status: "DONE",
-      updatedAt: "2026-10-19T10:00:00.000Z",
+      updatedAt,
     });
 
-    expect(result.tasks[0].status).toBe("DONE");
+    expect(result.tasks[0]).toEqual({
+      ...originalTask,
+      status: "DONE",
+      updatedAt,
+    });
+
+    expect(result.tasks[1]).toEqual(secondTask);
+    expect(result.tasks[1]).toBe(secondTask);
     expect(result.revision).toBe(1);
   });
 
@@ -114,14 +134,93 @@ describe("taskReducer", () => {
     expect(result).toBe(initialState);
   });
 
-  it("does not mutate the original state", () => {
-    const snapshot = structuredClone(initialState);
+  it.each([
+    {
+      name: "CREATE",
+      action: {
+        type: "CREATE" as const,
+        task: {
+          ...originalTask,
+          id: "task-2",
+        },
+      },
+    },
+    {
+      name: "UPDATE",
+      action: {
+        type: "UPDATE" as const,
+        id: "task-1",
+        values: {
+          title: "Updated title",
+          description: "",
+          priority: "LOW" as const,
+          dueDate: "",
+        },
+        updatedAt: "2026-10-19T10:00:00.000Z",
+      },
+    },
+    {
+      name: "DELETE",
+      action: {
+        type: "DELETE" as const,
+        id: "task-1",
+      },
+    },
+    {
+      name: "CHANGE_STATUS",
+      action: {
+        type: "CHANGE_STATUS" as const,
+        id: "task-1",
+        status: "DONE" as const,
+        updatedAt: "2026-10-19T10:00:00.000Z",
+      },
+    },
+  ])("does not mutate state during $name", ({ action }) => {
+    const state = structuredClone(initialState);
+    const snapshot = structuredClone(state);
 
-    taskReducer(initialState, {
-      type: "DELETE",
+    taskReducer(state, action);
+
+    expect(state).toEqual(snapshot);
+  });
+
+  it("updates only the target task and preserves other fields", () => {
+    const secondTask: Task = {
+      ...originalTask,
+      id: "task-2",
+      title: "Second task",
+    };
+
+    const state: TaskState = {
+      tasks: [originalTask, secondTask],
+      revision: 0,
+    };
+
+    const updatedAt = "2026-10-19T10:00:00.000Z";
+
+    const result = taskReducer(state, {
+      type: "UPDATE",
       id: "task-1",
+      values: {
+        title: "Updated assessment",
+        description: "Updated description",
+        priority: "MEDIUM",
+        dueDate: "2026-10-25",
+      },
+      updatedAt,
     });
 
-    expect(initialState).toEqual(snapshot);
+    expect(result.tasks[0]).toEqual({
+      ...originalTask,
+      title: "Updated assessment",
+      description: "Updated description",
+      priority: "MEDIUM",
+      dueDate: "2026-10-25",
+      updatedAt,
+    });
+
+    expect(result.tasks[1]).toEqual(secondTask);
+    expect(result.tasks[1]).toBe(secondTask);
+    expect(result.revision).toBe(1);
   });
 });

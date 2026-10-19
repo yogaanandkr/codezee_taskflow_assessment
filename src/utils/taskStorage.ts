@@ -72,13 +72,28 @@ export function loadTasks(): Task[] {
   return loadTasksWithStatus().tasks;
 }
 
+
+function backupOriginalData(original: string): void {
+  const firstBackup = localStorage.getItem(TASK_BACKUP_KEY);
+
+  if (firstBackup === null) {
+    localStorage.setItem(TASK_BACKUP_KEY, original);
+    return;
+  }
+
+  // Preserve previous backup and store a new recovery copy.
+  const backupKey = `${TASK_BACKUP_KEY}:${crypto.randomUUID()}`;
+  localStorage.setItem(backupKey, original);
+}
+
+
 export function saveTasks(tasks: Task[], preserveOriginal = false): boolean {
   try {
     if (preserveOriginal) {
       const original = localStorage.getItem(TASK_STORAGE_KEY);
 
-      if (original !== null && localStorage.getItem(TASK_BACKUP_KEY) === null) {
-        localStorage.setItem(TASK_BACKUP_KEY, original);
+      if (original !== null) {
+        backupOriginalData(original);
       }
     }
 
