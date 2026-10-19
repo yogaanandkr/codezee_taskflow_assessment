@@ -223,4 +223,46 @@ describe("taskReducer", () => {
     expect(result.tasks[1]).toBe(secondTask);
     expect(result.revision).toBe(1);
   });
+
+  it("clears description and due date when updating a task", () => {
+    const taskWithValues: Task = {
+      ...originalTask,
+      description: "This description should be cleared",
+      dueDate: "2026-10-25",
+    };
+
+    const state: TaskState = {
+      tasks: [taskWithValues],
+      revision: 0,
+    };
+
+    const updatedAt = "2026-10-19T12:00:00.000Z";
+
+    const result = taskReducer(state, {
+      type: "UPDATE",
+      id: taskWithValues.id,
+      values: {
+        title: taskWithValues.title,
+        description: "",
+        priority: taskWithValues.priority,
+        dueDate: "",
+      },
+      updatedAt,
+    });
+
+    expect(result.tasks[0]).toEqual({
+      ...taskWithValues,
+      description: "",
+      dueDate: "",
+      updatedAt,
+    });
+
+    expect(result.revision).toBe(1);
+
+    // Verify the original state was not mutated.
+    expect(state.tasks[0].description).toBe(
+      "This description should be cleared",
+    );
+    expect(state.tasks[0].dueDate).toBe("2026-10-25");
+  });
 });

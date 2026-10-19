@@ -165,16 +165,37 @@ describe("taskStorage", () => {
     expect(backups).toContain(secondCorruption);
   });
 
-  it("does not overwrite data when creating a backup fails", () => {
-    localStorage.setItem(TASK_STORAGE_KEY, "{invalid");
+  
+it("does not overwrite data when creating a backup fails", () => {
+  const originalData = "{invalid";
+  localStorage.setItem(TASK_STORAGE_KEY, originalData);
 
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(key => {
-      if (key.startsWith(TASK_BACKUP_KEY)) {
+  const originalSetItem = Storage.prototype.setItem;
+
+  const setItemSpy = vi
+    .spyOn(Storage.prototype, "setItem")
+    .mockImplementation(function (this: Storage, key: string, value: string) {
+      if (key === TASK_BACKUP_KEY) {
         throw new Error("Storage quota exceeded");
       }
+
+      return originalSetItem.call(this, key, value);
     });
 
-    expect(saveTasks([validTask], true)).toBe(false);
-    expect(localStorage.getItem(TASK_STORAGE_KEY)).toBe("{invalid");
-  });
+  const result = saveTasks([], true);
+
+  expect(result).toBe(false);
+
+  // Main data must remain untouched if backup creation fails.
+  expect(localStorage.getItem(TASK_STORAGE_KEY)).toBe(originalData);
+
+  // Confirm the backup operation was attempted.
+  expect(setItemSpy).toHaveBeenCalledWith(TASK_BACKUP_KEY, originalData);
+
+  // Confirm the main-key write was never attempted.
+  expect(setItemSpy.mock.calls.some(([key]) => key === TASK_STORAGE_KEY)).toBe(
+    false,
+  );
+});
+
 });
