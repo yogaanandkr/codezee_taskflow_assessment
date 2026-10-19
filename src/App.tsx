@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useReducer } from "react";
+import { useState } from "react";
 import styled from "styled-components";
 
 import { TaskForm } from "./components/tasks/TaskForm";
@@ -7,16 +7,8 @@ import { Modal } from "./components/ui/Modal";
 import { Button } from "./components/ui/TaskUI";
 import type { Task, TaskFormValues, TaskStatus } from "./types/task";
 import { TaskFilters } from "./components/tasks/TaskFilters";
-
-import {
-  DEFAULT_FILTERS,
-  type TaskFilters as TaskFiltersType,
-} from "./types/taskFilters";
-
-import { filterTasks } from "./utils/taskFilters";
-
-import { loadTasks, saveTasks } from "./utils/taskStorage";
-import { taskReducer } from "./utils/taskReducer";
+import { useTaskFilters } from "./hooks/useTaskFilters";
+import { useTasks } from "./hooks/useTasks";
 const Container = styled.main`
   max-width: 1200px;
   margin: 0 auto;
@@ -63,36 +55,23 @@ const Summary = styled.p`
 `;
 
 export default function App() {
-  const [{ tasks, revision }, dispatch] = useReducer(
-    taskReducer,
-    undefined,
-    () => ({
-      tasks: loadTasks(),
-      revision: 0,
-    }),
-  );
-  useEffect(() => {
-    if (revision === 0) return;
+  const {
+    tasks,
+    completedCount,
+    storageError,
+    createTask,
+    updateTask,
+    deleteTask,
+    changeTaskStatus,
+  } = useTasks();
 
-    saveTasks(tasks);
-  }, [tasks, revision]);
-
-  const [filters, setFilters] = useState<TaskFiltersType>({
-    ...DEFAULT_FILTERS,
-  });
+  const { filters, filteredTasks, setFilters, resetFilters } =
+    useTaskFilters(tasks);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [deletingTask, setDeletingTask] = useState<Task | null>(null);
 
-  const filteredTasks = useMemo(
-    () => filterTasks(tasks, filters),
-    [tasks, filters],
-  );
-
-  const resetFilters = () => {
-    setFilters({ ...DEFAULT_FILTERS });
-  };
   const openCreateForm = () => {
     setEditingTask(null);
     setIsFormOpen(true);
@@ -109,55 +88,35 @@ export default function App() {
   };
 
   const handleSaveTask = (values: TaskFormValues) => {
-    const now = new Date().toISOString();
-
     if (editingTask) {
-      dispatch({
-        type: "UPDATE",
-        id: editingTask.id,
-        values,
-        updatedAt: now,
-      });
+      updateTask(editingTask.id, values);
     } else {
-      const newTask: Task = {
-        id: crypto.randomUUID(),
-        ...values,
-        status: "TODO",
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      dispatch({ type: "CREATE", task: newTask });
+      createTask(values);
     }
 
     closeForm();
   };
 
   const handleStatusChange = (id: string, status: TaskStatus) => {
-    dispatch({
-      type: "CHANGE_STATUS",
-      id,
-      status,
-      updatedAt: new Date().toISOString(),
-    });
+    changeTaskStatus(id, status);
   };
 
   const handleDeleteTask = () => {
     if (!deletingTask) return;
 
-    dispatch({
-      type: "DELETE",
-      id: deletingTask.id,
-    });
-
+    deleteTask(deletingTask.id);
     setDeletingTask(null);
   };
-
-  const completedCount = tasks.filter(task => task.status === "DONE").length;
 
   return (
     <Container>
       <Header>
+        {storageError && (
+          <p role="alert">
+            Unable to save your changes in this browser. Your latest changes may
+            be lost after refreshing.
+          </p>
+        )}
         <div>
           <Heading>TaskFlow</Heading>
           <Description>Manage your work, one task at a time.</Description>

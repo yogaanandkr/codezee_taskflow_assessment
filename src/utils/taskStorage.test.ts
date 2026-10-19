@@ -2,7 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Task } from "../types/task";
 
-import { loadTasks, saveTasks, TASK_STORAGE_KEY } from "./taskStorage";
+import {
+  loadTasks,
+  loadTasksWithStatus,
+  saveTasks,
+  TASK_STORAGE_KEY,
+  TASK_BACKUP_KEY,
+} from "./taskStorage";
 
 const validTask: Task = {
   id: "task-1",
@@ -69,4 +75,127 @@ describe("taskStorage", () => {
 
     expect(loadTasks()).toEqual([]);
   });
+
+  it("marks malformed JSON as requiring a backup", () => {
+    localStorage.setItem(TASK_STORAGE_KEY, "{invalid");
+
+    const result = loadTasksWithStatus();
+
+    expect(result.tasks).toEqual([]);
+    expect(result.needsBackup).toBe(true);
+    expect(localStorage.getItem(TASK_STORAGE_KEY)).toBe("{invalid");
+  });
+
+  it("marks partially invalid data as requiring a backup", () => {
+    localStorage.setItem(
+      TASK_STORAGE_KEY,
+      JSON.stringify([validTask, { id: "broken", title: "" }]),
+    );
+
+    const result = loadTasksWithStatus();
+
+    expect(result.tasks).toEqual([validTask]);
+    expect(result.needsBackup).toBe(true);
+  });
+
+  it("backs up corrupted data before saving", () => {
+    const corrupted = "{invalid";
+
+    localStorage.setItem(TASK_STORAGE_KEY, corrupted);
+
+    const saved = saveTasks([validTask], true);
+
+    expect(saved).toBe(true);
+    expect(localStorage.getItem(TASK_BACKUP_KEY)).toBe(corrupted);
+    expect(loadTasks()).toEqual([validTask]);
+  });
+
+  it("does not overwrite an existing backup", () => {
+    localStorage.setItem(TASK_BACKUP_KEY, "first-backup");
+    localStorage.setItem(TASK_STORAGE_KEY, "second-version");
+
+    saveTasks([validTask], true);
+
+    expect(localStorage.getItem(TASK_BACKUP_KEY)).toBe("first-backup");
+  });
+
+  it("does not overwrite task data if backup creation fails", () => {
+    const corrupted = "{invalid";
+
+    localStorage.setItem(TASK_STORAGE_KEY, corrupted);
+
+    const originalSetItem = Storage.prototype.setItem;
+
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
+      this: Storage,
+      key: string,
+      value: string,
+    ) {
+      if (key === TASK_BACKUP_KEY) {
+        throw new Error("Storage quota exceeded");
+      }
+
+      return originalSetItem.call(this, key, value);
+    });
+
+    expect(saveTasks([validTask], true)).toBe(false);
+
+    expect(localStorage.getItem(TASK_STORAGE_KEY)).toBe(corrupted);
+  });
+
+  it("preserves multiple corrupted versions before overwriting", () => {
+    const firstCorruption = "{first-invalid";
+    const secondCorruption = "{second-invalid";
+
+    localStorage.setItem(TASK_STORAGE_KEY, firstCorruption);
+
+    expect(saveTasks([validTask], true)).toBe(true);
+
+    localStorage.setItem(TASK_STORAGE_KEY, secondCorruption);
+
+    expect(saveTasks([validTask], true)).toBe(true);
+
+    const backupKeys = Object.keys(localStorage).filter(
+      key => key === TASK_BACKUP_KEY || key.startsWith(`${TASK_BACKUP_KEY}:`),
+    );
+
+    const backups = backupKeys.map(key => localStorage.getItem(key));
+
+    expect(backups).toContain(firstCorruption);
+    expect(backups).toContain(secondCorruption);
+  });
+
+  
+it("does not overwrite data when creating a backup fails", () => {
+  const originalData = "{invalid";
+  localStorage.setItem(TASK_STORAGE_KEY, originalData);
+
+  const originalSetItem = Storage.prototype.setItem;
+
+  const setItemSpy = vi
+    .spyOn(Storage.prototype, "setItem")
+    .mockImplementation(function (this: Storage, key: string, value: string) {
+      if (key === TASK_BACKUP_KEY) {
+        throw new Error("Storage quota exceeded");
+      }
+
+      return originalSetItem.call(this, key, value);
+    });
+
+  const result = saveTasks([], true);
+
+  expect(result).toBe(false);
+
+  // Main data must remain untouched if backup creation fails.
+  expect(localStorage.getItem(TASK_STORAGE_KEY)).toBe(originalData);
+
+  // Confirm the backup operation was attempted.
+  expect(setItemSpy).toHaveBeenCalledWith(TASK_BACKUP_KEY, originalData);
+
+  // Confirm the main-key write was never attempted.
+  expect(setItemSpy.mock.calls.some(([key]) => key === TASK_STORAGE_KEY)).toBe(
+    false,
+  );
+});
+
 });
